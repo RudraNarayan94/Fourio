@@ -12,6 +12,12 @@ class HybridClient(DBClient):
         self._redis = redis_client
         self._mongo = mongo_client
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.Close()
+
     def Close(self) -> Optional[Exception]:
         err1 = self._redis.Close()
         err2 = self._mongo.Close()
@@ -57,6 +63,38 @@ class HybridClient(DBClient):
 
     def GetSongByKey(self, key: str) -> Tuple[Optional[Song], bool, Optional[Exception]]:
         return self.GetSong("key", key)
+
+    def GetSongsByIDs(self, songIDs: List[int]) -> Tuple[Dict[int, Song], Optional[Exception]]:
+        """Fetch multiple songs, trying Redis first then MongoDB."""
+        if not songIDs:
+            return {}, None
+        
+        songs_map = {}
+        missing_ids = []
+        
+        # Try Redis first for each song
+        for song_id in songIDs:
+            song, found, err = self._redis.GetSongByID(song_id)
+            if found and song:
+                songs_map[song_id] = song
+            else:
+                missing_ids.append(song_id)
+        
+        # For missing songs, fetch from MongoDB
+        if missing_ids:
+            mongo_map, mongo_err = self._mongo.GetSongsByIDs(missing_ids)
+            if mongo_err:
+                print(f"[Hybrid Warning] MongoDB GetSongsByIDs failed: {mongo_err}")
+            else:
+                # Ingest missing songs into Redis for next time
+                for song_id, song in mongo_map.items():
+                    songs_map[song_id] = song
+                    try:
+                        self._redis.RegisterSong(song.Title, song.Artist, song.YouTubeID)
+                    except Exception as e:
+                        print(f"[Hybrid Warning] Redis ingest failed for song {song_id}: {e}")
+        
+        return songs_map, None
 
     def DeleteSongByID(self, songID: int) -> Optional[Exception]:
         err1 = self._redis.DeleteSongByID(songID)

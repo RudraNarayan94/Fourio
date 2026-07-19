@@ -14,6 +14,12 @@ class RedisClient(DBClient):
     def __init__(self, client: redis.Redis):
         self._client = client
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.Close()
+
     def Close(self) -> Optional[Exception]:
         try:
             self._client.close()
@@ -132,7 +138,7 @@ class RedisClient(DBClient):
 
 
 # --- factory method ---
-def NewRedisClient(redis_url: str, host: str = "localhost", port: int = 6379, db: int = 0) -> Tuple[Optional[RedisClient], Optional[Exception]]:
+def NewRedisClient(redis_url: str, host: str = "redis", port: int = 6379, db: int = 0) -> Tuple[Optional[RedisClient], Optional[Exception]]:
     try:
         if redis_url:
             client = redis.Redis.from_url(redis_url, decode_responses=True)
