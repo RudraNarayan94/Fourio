@@ -42,8 +42,8 @@ def find_command(file_path: str = typer.Argument(..., help="Path to the audio fi
   cli_logic.find(file_path)
 
 
-@app.command(name="download", help="Downloads and fingerprints a resource from a Spotify URL.")
-def download_command(url: str = typer.Argument(..., help="Spotify URL (track, playlist, or album link).")):
+@app.command(name="download", help="Downloads and fingerprints a resource from Spotify or YouTube URL.")
+def download_command(url: str = typer.Argument(..., help="Spotify or YouTube URL (track, playlist, album, or video link).")):
     
   cli_logic.download(url)
 

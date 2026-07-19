@@ -1,5 +1,7 @@
 services:
   api:
+    env_file:
+      - .env
     environment:
       DB_HOST: mongo
       REDIS_HOST: redis
@@ -40,3 +42,6 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+volumes:
+  mongo_data:
+  redis_data:

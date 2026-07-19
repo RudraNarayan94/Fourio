@@ -26,7 +26,7 @@ def NewDBClient() -> Tuple[Optional[DBClient], Optional[Exception]]:
         elif dbUsername and dbPassword:
             dbUri = f"mongodb://{dbUsername}:{dbPassword}@{dbHost}:{dbPort}/{dbName}?authSource=admin"
         else:
-            dbUri = "mongodb://localhost:27017"
+            dbUri = "mongodb://mongo:27017"
 
         if DBtype == "mongo":
             return NewMongoClient(dbUri)

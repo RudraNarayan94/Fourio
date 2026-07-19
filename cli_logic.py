@@ -2,8 +2,10 @@ import os
 import sys
 import math
 import time
+import subprocess
 from typing import  Optional
 from pathlib import Path
+import re
 
 # project imports
 from app.services.wav.wav_io import ReadWavInfo, WavBytesToSamples, GetMetadata
@@ -22,6 +24,14 @@ RESET_COLOR_CODE = "\033[0m"
 
 def yellow_print(message: str):
     print(f"{YELLOW_COLOR_CODE}{message}{RESET_COLOR_CODE}", file=sys.stderr)
+
+def extract_youtube_id(youtube_url: str) -> str:
+    """Extract YouTube video ID from various YouTube URL formats."""
+    # Pattern for youtube.com/watch?v=VIDEO_ID or youtu.be/VIDEO_ID
+    match = re.search(r'(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)', youtube_url)
+    if match:
+        return match.group(1)
+    return ""
 
 # ----------------------------------------------------------------------
 # --- CLI Command Implementations ---
@@ -96,26 +106,113 @@ def find(file_path: str):
                 yellow_print(f"Warning: Failed to delete temporary file: {err}")
 
 
-def download(spotify_url: str):
+def download(url: str):
     err = CreateFolder(SONGS_DIR)
     if err:
         logger.error(f"Failed to create directory {SONGS_DIR}: {err}")
         return
-        
-    # Dispatch download based on URL content
-    if "album" in spotify_url:
-      total_downloaded, download_error = DlAlbum(spotify_url, SONGS_DIR)
-    elif "playlist" in spotify_url:
-      total_downloaded, download_error = DlPlaylist(spotify_url, SONGS_DIR)
-    elif "track" in spotify_url:
-      total_downloaded, download_error = DlSingleTrack(spotify_url, SONGS_DIR)
-    else:
-      download_error = Exception(f"Invalid Spotify URL type: {spotify_url}")
+    
+    # Check if it's a YouTube URL
+    if "youtube.com" in url or "youtu.be" in url:
+        download_from_youtube(url)
+    # Check if it's a Spotify URL
+    elif "spotify.com" in url:
+        # Dispatch download based on URL content
+        if "album" in url:
+            total_downloaded, download_error = DlAlbum(url, SONGS_DIR)
+        elif "playlist" in url:
+            total_downloaded, download_error = DlPlaylist(url, SONGS_DIR)
+        elif "track" in url:
+            total_downloaded, download_error = DlSingleTrack(url, SONGS_DIR)
+        else:
+            download_error = Exception(f"Invalid Spotify URL type: {url}")
 
-    if download_error:
-        yellow_print(f"Error: {download_error}")
+        if download_error:
+            yellow_print(f"Error: {download_error}")
+        else:
+            print(f"\nDownload process initiated successfully for {url}.")
     else:
-        print(f"\nDownload process initiated successfully for {spotify_url}.")
+        yellow_print(f"Error: URL must be a Spotify or YouTube URL")
+
+
+def download_from_youtube(youtube_url: str):
+    """Download a song from YouTube URL and fingerprint it."""
+    try:
+        print(f"Downloading from YouTube: {youtube_url}")
+        
+        # Extract YouTube ID early
+        youtube_id = extract_youtube_id(youtube_url)
+        if not youtube_id:
+            yellow_print("Error: Could not extract YouTube video ID from URL")
+            return
+        
+        # Download audio using yt-dlp
+        output_path = os.path.join(SONGS_DIR, "%(title)s.%(ext)s")
+        cmd = [
+            "yt-dlp",
+            "-f", "bestaudio/best",
+            "-x",
+            "--audio-format", "mp3",
+            "--extractor-args", "youtube:player_client=web_mobile",  # Use web_mobile to avoid SABR
+            "--no-warnings",  # Suppress warnings
+            "-o", output_path,
+            youtube_url
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode != 0:
+            yellow_print(f"Error downloading from YouTube: {result.stderr}")
+            return
+        
+        # Extract video title from yt-dlp output to get the downloaded file
+        # yt-dlp outputs the filename in stdout
+        output_lines = result.stdout.strip().split('\n')
+        downloaded_file = None
+        
+        for line in output_lines:
+            if "Destination:" in line:
+                downloaded_file = line.split("Destination:")[-1].strip()
+                break
+        
+        if not downloaded_file:
+            # Try to find the most recently modified file in SONGS_DIR
+            song_files = [f for f in os.listdir(SONGS_DIR) if f.endswith(('.mp3', '.m4a', '.wav'))]
+            if song_files:
+                downloaded_file = os.path.join(SONGS_DIR, max(song_files, key=lambda f: os.path.getctime(os.path.join(SONGS_DIR, f))))
+        
+        if not downloaded_file or not os.path.exists(downloaded_file):
+            yellow_print("Error: Could not determine downloaded file path")
+            return
+        
+        print(f"Downloaded: {downloaded_file}")
+        
+        # Extract title and artist from filename
+        filename = Path(downloaded_file).stem
+        # Try to parse "Artist - Title" format
+        title = filename
+        artist = "Unknown Artist"
+        
+        if " - " in filename:
+            parts = filename.split(" - ", 1)
+            artist = parts[0].strip()
+            title = parts[1].strip()
+        
+        print(f"Processing: {title} by {artist} (YouTube ID: {youtube_id})")
+        
+        # Process and save the song with YouTube ID
+        err = ProcessAndSaveSong(downloaded_file, title, artist, youtube_id)
+        if err:
+            yellow_print(f"Error processing song: {err}")
+            return
+        
+        print(f"✓ Successfully saved: {title} by {artist}")
+        
+    except subprocess.TimeoutExpired:
+        yellow_print("Error: Download timeout (exceeded 5 minutes)")
+    except Exception as e:
+        yellow_print(f"Error: {e}")
+        logger.error(f"YouTube download error: {e}", exc_info=True)
 
 
 def erase(songs_dir: str):    

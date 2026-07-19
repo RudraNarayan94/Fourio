@@ -48,6 +48,8 @@ def filter_matches(
     for song_id, anchor_times in target_zones.items():
         keys_to_delete = [anchor_time for anchor_time, count in anchor_times.items() 
                           if count < TARGET_ZONE_SIZE]
+        if keys_to_delete:
+            print(f"  [filter_matches] Song {song_id}: Removing {len(keys_to_delete)} zones (low couple count)")
         for key in keys_to_delete:
              del target_zones[song_id][key]
 
@@ -56,6 +58,9 @@ def filter_matches(
         # if the number of remaining valid target zones meets the threshold
         if len(zones) >= threshold:
             filtered_matches[song_id] = matches[song_id]
+            print(f"  [filter_matches] Song {song_id}: PASSED (has {len(zones)} valid zones, threshold={threshold})")
+        else:
+            print(f"  [filter_matches] Song {song_id}: FILTERED OUT (only {len(zones)} valid zones, threshold={threshold})")
 
     return filtered_matches
 
@@ -136,9 +141,16 @@ def FindMatchesFGP(sample_fingerprint: Dict[int, int]) -> Tuple[List[Match], flo
         print(f"[FindMatchesFGP DEBUG] Match processing completed in {process_time:.4f} seconds")
         print(f"[FindMatchesFGP DEBUG] Found {len(matches)} unique songs with matches")
 
-        # Filter Matches 
+        # Filter Matches
+        print(f"[FindMatchesFGP DEBUG] Before filtering: {len(matches)} songs have potential matches")
+        for song_id in matches.keys():
+            valid_zones = len(target_zones[song_id])
+            print(f"  Song {song_id}: {valid_zones} valid target zones, {len(matches[song_id])} couple matches")
+        
         # matches = filter_matches(10, matches, target_zones)
         matches = filter_matches(4, matches, target_zones)
+        
+        print(f"[FindMatchesFGP DEBUG] After filtering (threshold=4): {len(matches)} songs remain")
 
         # analyze Relative Timing (Scoring)
         print(f"[FindMatchesFGP DEBUG] Analyzing relative timing and scoring...")

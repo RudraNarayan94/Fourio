@@ -75,6 +75,8 @@ def download_yt_audio(id: str, path: str, file_path: str) -> Optional[Exception]
         "--extract-audio",              # Extract audio only
         "--audio-format", "m4a",        # Specify format (m4a)
         "--audio-quality", "128K",      # Equivalent to Itag 140 quality
+        "--extractor-args", "youtube:player_client=web_mobile",  # Use web_mobile to avoid SABR
+        "--no-warnings",                # Suppress warnings
         "-o", file_path,                # Output template (e.g., /path/to/Track - Artist.m4a)
         f"https://www.youtube.com/watch?v={id}",
     ]
