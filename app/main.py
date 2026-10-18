@@ -8,7 +8,7 @@ from app.api.router import router
 logger = GetLogger()
 
 def init_directories():
-    for folder in ["tmp", os.getenv("SONGS_DIR", "songs")]:
+    for folder in ["tmp", os.getenv("SONGS_DIR", "songs"), "recordings", "db"]:
         try:
             CreateFolder(folder)
         except Exception as e:

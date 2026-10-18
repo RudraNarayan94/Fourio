@@ -1,3 +1,4 @@
+import os
 from typing import Tuple, Optional
 from fastapi import HTTPException
 from app.models.model import DBClient
@@ -13,6 +14,7 @@ def NewDBClient() -> Tuple[Optional[DBClient], Optional[Exception]]:
     DBtype = GetEnv("DB_TYPE", "sqlite")
 
     if DBtype == "mongo" or DBtype == "hybrid":
+        is_docker = os.path.exists("/.dockerenv")
         dbUsername = GetEnv("DB_USER")
         dbPassword = GetEnv("DB_PASS")
         dbName     = GetEnv("DB_NAME")
@@ -20,13 +22,37 @@ def NewDBClient() -> Tuple[Optional[DBClient], Optional[Exception]]:
         dbPort     = GetEnv("DB_PORT")
         mongoUri   = GetEnv("MONGO_URL")
         redisUri   = GetEnv("REDIS_URL")
+        redisHost  = GetEnv("REDIS_HOST")
+        redisPort  = GetEnv("REDIS_PORT", "6379")
         
+        # Redis URI resolution
+        if not redisUri:
+            host = redisHost or ("redis" if is_docker else "localhost")
+            redisUri = f"redis://{host}:{redisPort}/0"
+        elif is_docker and ("localhost" in redisUri or "127.0.0.1" in redisUri):
+            host = redisHost or "redis"
+            redisUri = redisUri.replace("localhost", host).replace("127.0.0.1", host)
+        elif not is_docker and ("//redis:" in redisUri):
+            redisUri = redisUri.replace("//redis:", "//localhost:")
+
+        # Mongo URI resolution
         if mongoUri:
-            dbUri = mongoUri
+            if is_docker and ("localhost" in mongoUri or "127.0.0.1" in mongoUri):
+                host = dbHost or "mongo"
+                dbUri = mongoUri.replace("localhost", host).replace("127.0.0.1", host)
+            elif not is_docker and ("@mongo:" in mongoUri or "//mongo:" in mongoUri):
+                dbUri = mongoUri.replace("@mongo:", "@localhost:").replace("//mongo:", "//localhost:")
+            else:
+                dbUri = mongoUri
         elif dbUsername and dbPassword:
-            dbUri = f"mongodb://{dbUsername}:{dbPassword}@{dbHost}:{dbPort}/{dbName}?authSource=admin"
+            default_host = "mongo" if is_docker else "localhost"
+            host = dbHost if (is_docker or dbHost not in ("mongo", "redis")) else default_host
+            port = dbPort or "27017"
+            name = dbName or "fourio"
+            dbUri = f"mongodb://{dbUsername}:{dbPassword}@{host}:{port}/{name}?authSource=admin"
         else:
-            dbUri = "mongodb://mongo:27017"
+            default_host = "mongo" if is_docker else "localhost"
+            dbUri = f"mongodb://{default_host}:27017"
 
         if DBtype == "mongo":
             return NewMongoClient(dbUri)
@@ -35,7 +61,10 @@ def NewDBClient() -> Tuple[Optional[DBClient], Optional[Exception]]:
             return NewHybridClient(dbUri, redisUri)  
 
     elif DBtype == "sqlite":
-        return NewSQLiteClient("db/db.sqlite3")
+        from pathlib import Path
+        db_path = Path("db/db.sqlite3")
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return NewSQLiteClient(str(db_path))
 
     return None, Exception(f"unsupported database type: {DBtype}")
 

@@ -38,8 +38,8 @@ RUN apt-get update && \
 # Copy project files
 COPY --from=builder /app /app
 
-# Update yt-dlp to latest version and install node-gyp for better support
-RUN uv pip install --system --upgrade yt-dlp && \
+# Update yt-dlp to latest version in the venv and install node-gyp for better support
+RUN uv pip install --python /app/.venv --upgrade yt-dlp && \
     npm install -g node-gyp
 
 # Set PATH

@@ -24,3 +24,4 @@ def schedule_redis_fingerprint_store(redis_client, fingerprints):
         daemon=True
     )
     t.start()
+    return t

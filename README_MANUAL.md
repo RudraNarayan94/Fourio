@@ -6,7 +6,7 @@ This guide explains how to run **Fourio** locally without Docker.
 
 # ✔ Prerequisites
 
-## 🔹 Python 3.10+
+## 🔹 Python 3.12+
 
 Download:
 
@@ -124,16 +124,29 @@ pip install -r requirements.txt
 
 # 🎵 Environment Configuration
 
-Create a `.env` file in the project root.
+Create a `.env` file in the project root:
 
-Use `.env.example` as reference.
+```bash
+cp .env.example .env
+```
 
-Example:
+Use `.env.example` as reference:
 
 ```env
-SPOTIFY_CLIENT_ID=your-client-id
-SPOTIFY_CLIENT_SECRET=your-client-secret
-DATABASE_URL=your-db-url
+# Database Mode: mongo, hybrid, or sqlite
+DB_TYPE=mongo
+DB_USER=user
+DB_PASS=password
+DB_NAME=fourio
+DB_HOST=localhost
+DB_PORT=27017
+
+MONGO_URL=mongodb://user:password@localhost:27017/fourio
+REDIS_URL=redis://localhost:6379/0
+
+SPOTIFY_CLIENT_ID=your-spotify-client-id
+SPOTIFY_CLIENT_SECRET=your-spotify-client-secret
+YOUTUBE_API_KEY=your-youtube-api-key
 ```
 
 ---
@@ -145,6 +158,14 @@ DATABASE_URL=your-db-url
 ```bash
 uv run python -m uvicorn app.main:app --reload
 ```
+
+Once running, access the service:
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| **FastAPI Root** | [http://localhost:8000](http://localhost:8000) | Backend status |
+| **Swagger UI** | [http://localhost:8000/docs](http://localhost:8000/docs) | Interactive API exploration |
+| **ReDoc** | [http://localhost:8000/redoc](http://localhost:8000/redoc) | OpenAPI documentation |
 
 ---
 

@@ -5,6 +5,11 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    volumes:
+      - ./songs:/app/songs
+      - ./recordings:/app/recordings
+      - ./tmp:/app/tmp
+      - ./db:/app/db
     restart: unless-stopped
 
 volumes:

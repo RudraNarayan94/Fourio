@@ -25,6 +25,8 @@ def CreateFolder(folder_path: str) -> Optional[Exception]:
 
 def MoveFile(source_path: str, destination_path: str) -> Optional[Exception]:
     try:
+        if os.path.abspath(source_path) == os.path.abspath(destination_path):
+            return None
         shutil.move(source_path, destination_path)
         return None
     except Exception as e:

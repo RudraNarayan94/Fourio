@@ -314,47 +314,54 @@ def save(path: str, force: bool):
         except ValueError:
             return Exception("Failed to parse duration.")
 
-        #tags
+        # tags
         tags = metadata.get("format", {}).get("tags", {})
-        
+        title = tags.get("title", "").strip()
+        artist = tags.get("artist", "").strip()
+        album = tags.get("album", "").strip()
+
+        # If title or artist are missing from metadata tags, parse from filename
+        filename = Path(file_path).stem
+        if not title or not artist:
+            if " - " in filename:
+                parts = filename.split(" - ", 1)
+                if not artist:
+                    artist = parts[0].strip()
+                if not title:
+                    title = parts[1].strip()
+            else:
+                if not title:
+                    title = filename
+                if not artist:
+                    artist = "Unknown Artist"
+
         track = Track(
-            Album=tags.get("album", ""),
-            Artist=tags.get("artist", ""),
-            Title=tags.get("title", ""),
-            Duration=int(math.ceil(duration_float)), 
-            Artists=[], 
+            Album=album,
+            Artist=artist,
+            Title=title,
+            Duration=int(math.ceil(duration_float)),
+            Artists=[artist] if artist else [],
         )
 
         # 2. Get YouTube ID
         yt_id, err = GetYoutubeId(track)
         if err is not None and not force:
             return Exception(f"Failed to get YouTube ID for song: {err}")
-        
-        # 3. Final checks and prep
-        if track.Title == "":
-            track = track._replace(Title=Path(file_path).stem) # Use filename stem
-        if track.Artist == "":
-            return Exception("No artist found in metadata or filename.")
 
-        # 4. Process (DSP/Fingerprint/DB Registration)
+        # 3. Process (DSP/Fingerprint/DB Registration)
         # Note: ProcessAndSaveSong will automatically call ConvertToWAV internally if needed
         err = ProcessAndSaveSong(file_path, track.Title, track.Artist, yt_id or "")
         if err is not None:
             return Exception(f"Failed to process or save song: {err}")
 
-        # 5. Move song file 
-        file_name = Path(file_path).stem + ".wav"
-        source_path = file_path # Assuming ProcessAndSaveSong leaves the WAV where it is
-        new_file_path = os.path.join(SONGS_DIR, file_name)
-        
-        # NOTE: The MoveFile logic is tricky. It seems to assume the WAV file 
-        # is created next to the source file. Assuming processed WAV is at source_path:
-        
-        # shutil.move is the Python equivalent of os.Rename (Go's MoveFile)
-        try:
-            MoveFile(source_path, new_file_path)
-        except Exception as e:
-            return Exception(f"Failed to move file from {source_path} to {new_file_path}: {e}")
+        # 4. If the source file was outside SONGS_DIR, ensure the converted WAV is moved to SONGS_DIR
+        converted_wav = Path(file_path).with_suffix(".wav")
+        dest_wav = Path(SONGS_DIR) / converted_wav.name
+        if converted_wav.exists() and converted_wav.resolve() != dest_wav.resolve():
+            try:
+                MoveFile(str(converted_wav), str(dest_wav))
+            except Exception as e:
+                logger.warning(f"Could not move WAV file to {SONGS_DIR}: {e}")
 
         return None
     
@@ -367,9 +374,13 @@ def save(path: str, force: bool):
                 err = save_song(full_path, force)
                 if err:
                     print(f"Error saving song ({full_path}): {err}")
+                else:
+                    print(f"✓ Successfully saved: {item}")
     elif path_obj.is_file():
         err = save_song(path, force)
         if err:
             print(f"Error saving song ({path}): {err}")
+        else:
+            print(f"✓ Successfully saved: {path_obj.name}")
     else:
         print(f"Error: Path must be a valid file or directory: {path}")
