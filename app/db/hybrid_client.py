@@ -11,6 +11,7 @@ class HybridClient(DBClient):
     def __init__(self, redis_client: RedisClient, mongo_client: MongoClient):
         self._redis = redis_client
         self._mongo = mongo_client
+        self._bg_threads = []
 
     def __enter__(self):
         return self
@@ -19,6 +20,10 @@ class HybridClient(DBClient):
         self.Close()
 
     def Close(self) -> Optional[Exception]:
+        for t in self._bg_threads:
+            if t.is_alive():
+                t.join(timeout=3.0)
+        self._bg_threads.clear()
         err1 = self._redis.Close()
         err2 = self._mongo.Close()
         if err1:
@@ -111,13 +116,15 @@ class HybridClient(DBClient):
     def StoreFingerprints(self, fingerprints: Dict[int, Couple]) -> Optional[Exception]:
         err = self._mongo.StoreFingerprints(fingerprints)  # durable first
         if not err:
-            schedule_redis_fingerprint_store(self._redis, fingerprints) 
+            t = schedule_redis_fingerprint_store(self._redis, fingerprints)
+            if t:
+                self._bg_threads.append(t)
         return None
 
     def GetCouples(self, addresses: List[int]) -> Tuple[Dict[int, List[Couple]], Optional[Exception]]:
         # Try Redis first
         couples_map, err = self._redis.GetCouples(addresses)
-        missing_addresses = [a for a in addresses if a not in couples_map]
+        missing_addresses = [a for a in addresses if not couples_map.get(a)]
         if not missing_addresses:
             return couples_map, err
 

@@ -26,8 +26,8 @@ docker compose version
 |------|----------|
 | `Dockerfile` | Docker image definition |
 | `docker-compose.yml` | Default application setup |
-| `docker-compose-mongo.yml` | MongoDB-only setup |
-| `docker-compose-hybrid.yml` | Mongo + Redis environment setup |
+| `docker-compose.mongo.yml` | MongoDB-only setup |
+| `docker-compose.hybrid.yml` | Mongo + Redis environment setup |
 | `Makefile` | Helper commands for Docker workflows |
 
 ---
@@ -47,15 +47,34 @@ cd fourio
 
 Create a `.env` file in the project root.
 
-Use `.env.example` as reference.
+Use `.env.example` as reference:
 
-Example:
+```bash
+cp .env.example .env
+```
+
+Example `.env` configuration:
 
 ```env
-SPOTIFY_CLIENT_ID=your-client-id
-SPOTIFY_CLIENT_SECRET=your-client-secret
-DATABASE_URL=your-db-url
+# Database Mode: mongo, hybrid, or sqlite
+DB_TYPE=hybrid
+DB_USER=user
+DB_PASS=password
+DB_NAME=fourio
+DB_HOST=mongo
+DB_PORT=27017
+
+# Direct Connection Strings (used by the app)
+MONGO_URL=mongodb://user:password@mongo:27017/fourio
+REDIS_URL=redis://redis:6379/0
+
+# API Keys
+SPOTIFY_CLIENT_ID=your-spotify-client-id
+SPOTIFY_CLIENT_SECRET=your-spotify-client-secret
+YOUTUBE_API_KEY=your-youtube-api-key
 ```
+
+> **Note**: When running inside Docker via Compose, use container hostnames (`DB_HOST=mongo`, `REDIS_URL=redis://redis:6379/0`). When running locally outside Docker, use `localhost` (e.g. `127.0.0.1:27017` / `127.0.0.1:6379`).
 
 ---
 
@@ -96,16 +115,25 @@ make down
 
 # 🐳 Manual Docker Commands
 
-## Build and Start Containers
+If you don't have `make` installed, you can run the Docker Compose commands directly:
 
+### 1. Hybrid Environment (Mongo + Redis - Recommended)
 ```bash
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.hybrid.yml up --build
+```
+Detached mode:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.hybrid.yml up -d --build
 ```
 
-Detached mode:
-
+### 2. MongoDB-Only Environment
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.mongo.yml up --build
+```
+
+### 3. Default (API Only)
+```bash
+docker compose up --build
 ```
 
 ---
@@ -113,7 +141,7 @@ docker compose up -d --build
 ## Stop Containers
 
 ```bash
-docker compose down
+docker compose -f docker-compose.yml -f docker-compose.hybrid.yml down
 ```
 
 ---

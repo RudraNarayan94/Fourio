@@ -117,8 +117,9 @@ class RedisClient(DBClient):
                 pipe.lrange(f"{REDIS_FINGERPRINT_PREFIX}{address}", 0, -1)
             results = pipe.execute()
             for address, couples_json in zip(addresses, results):
-                couples_list = [Couple(**json.loads(c)) for c in couples_json]
-                couples_map[address] = couples_list
+                if couples_json:
+                    couples_list = [Couple(**json.loads(c)) for c in couples_json]
+                    couples_map[address] = couples_list
             return couples_map, None
         except Exception as e:
             return {}, e

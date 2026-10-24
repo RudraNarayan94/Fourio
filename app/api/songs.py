@@ -4,7 +4,7 @@ import re
 import subprocess
 from pathlib import Path
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from app.db.db_clients import get_db_client
 from app.models.model import DBClient
 from app.services.spotify.spotify_service import TrackInfo, PlaylistInfo, AlbumInfo 
@@ -45,6 +45,84 @@ def handle_total_songs(db: DBClient = Depends(get_db_client)):
         return {"totalSongs": total_songs}
     finally:
         pass
+
+# --------------------------------------------------------------------
+# 1.5. DELETE /songs (handleDeleteSong)
+# --------------------------------------------------------------------
+@router.delete("/", response_model=Dict[str, Any])
+def handle_delete_song(
+    song_id: int = Query(None, description="Delete by Song ID"),
+    yt_id: str = Query(None, description="Delete by YouTube ID"),
+    title: str = Query(None, description="Delete by Title (requires artist)"),
+    artist: str = Query(None, description="Delete by Artist (requires title)"),
+    db: DBClient = Depends(get_db_client)
+):
+    """
+    Delete a song from all databases (MongoDB, SQLite, Redis if using hybrid).
+    
+    Supports deletion by:
+    - song_id: Direct Song ID
+    - yt_id: YouTube video ID
+    - title + artist: Song title and artist name
+    
+    Example usage:
+    - DELETE /songs?song_id=123
+    - DELETE /songs?yt_id=dQw4w9WgXcQ
+    - DELETE /songs?title=Shape%20of%20You&artist=Ed%20Sheeran
+    """
+    try:
+        song_to_delete = None
+        search_param = None
+        
+        # Determine which parameter was provided and fetch the song
+        if song_id:
+            song_to_delete, exists, err = db.GetSongByID(song_id)
+            search_param = f"Song ID: {song_id}"
+        elif yt_id:
+            song_to_delete, exists, err = db.GetSongByYTID(yt_id)
+            search_param = f"YouTube ID: {yt_id}"
+        elif title and artist:
+            song_key = GenerateSongKey(title, artist)
+            song_to_delete, exists, err = db.GetSongByKey(song_key)
+            search_param = f"Title: {title}, Artist: {artist}"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Must provide either: song_id, yt_id, or both title and artist"
+            )
+        
+        # Check if song was found
+        if err:
+            logger.error(f"Error searching for song: {err}")
+            raise HTTPException(status_code=500, detail="Database error during search")
+        
+        if not exists or not song_to_delete:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Song not found with {search_param}"
+            )
+        
+        # Get song ID for deletion
+        song_id_to_delete = song_to_delete.SongID if hasattr(song_to_delete, 'SongID') else song_id
+        
+        # Delete from all databases
+        delete_err = db.DeleteSongByID(song_id_to_delete)
+        if delete_err:
+            logger.error(f"Error deleting song: {delete_err}")
+            raise HTTPException(status_code=500, detail=f"Failed to delete song: {str(delete_err)}")
+        
+        logger.info(f"Successfully deleted song: '{song_to_delete.Title}' by '{song_to_delete.Artist}' (ID: {song_id_to_delete})")
+        
+        return {
+            "status": "success",
+            "message": f"Successfully deleted '{song_to_delete.Title}' by '{song_to_delete.Artist}' from all databases"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in delete song handler: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 # --------------------------------------------------------------------
 # 2. POST /songs/download

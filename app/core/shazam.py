@@ -44,10 +44,13 @@ def filter_matches(
     Filters out songs that don't have enough verified target zones.
     """
     
-    # 1. Filter out non-target zones (count < TARGET_ZONE_SIZE)
+    # 1. Filter out anchor times with insufficient couples.
+    # Note: When addresses are sampled (MAX_ADDRESSES=2000) or under audio noise,
+    # expecting all TARGET_ZONE_SIZE couples per anchor time leads to false negatives.
+    min_couples = 1
     for song_id, anchor_times in target_zones.items():
         keys_to_delete = [anchor_time for anchor_time, count in anchor_times.items() 
-                          if count < TARGET_ZONE_SIZE]
+                          if count < min_couples]
         if keys_to_delete:
             print(f"  [filter_matches] Song {song_id}: Removing {len(keys_to_delete)} zones (low couple count)")
         for key in keys_to_delete:
