@@ -43,8 +43,8 @@ This version of **Fourio** is fully written in **Python**, powered by:
   ├── .env                       # Environment variables
   ├── Dockerfile                 # Docker image definition
   ├── docker-compose.yml         # Default Docker setup
-  ├── docker-compose-mongo.yml   # MongoDB-only services
-  ├── docker-compose-hybrid.yml  # Hybrid deployment setup
+  ├── docker-compose.mongo.yml   # MongoDB-only services
+  ├── docker-compose.hybrid.yml  # Hybrid deployment setup
   ├── Makefile                   # Helper commands for Docker workflows
   ├── pyproject.toml             # uv dependencies
   ├── requirements.txt           # Python dependencies  (Optional)
@@ -85,14 +85,25 @@ uv run python cli.py --help
 | `save <path_or_dir> [--force/-f]` | Fingerprint and save local songs                          |
 | `erase`                           | Clear all stored songs and fingerprints from the database |
 <!-- | `serve --proto http --port 8000`  | Start the FastAPI backend server                          | -->
-# Endpoints
+# 🌐 API Access & Documentation
+
+When the backend server or Docker environment is running:
+
+| Interface | URL | Description |
+|-----------|-----|-------------|
+| **Backend Service** | [http://localhost:8000](http://localhost:8000) | Root status check |
+| **Swagger UI Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | Interactive API exploration and testing |
+| **ReDoc** | [http://localhost:8000/redoc](http://localhost:8000/redoc) | Alternative OpenAPI documentation |
+
+## 📡 Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/fourio/match` | POST | Match audio fingerprint against database and return top 10 matches |
 | `/recordings/save` | POST | Save base64-encoded audio recording as WAV file |
 | `/songs/total` | GET | Get total number of indexed songs in database |
-| `/songs/download` | POST | Download and process Spotify track/album/playlist |
+| `/songs/download` | POST | Download and process Spotify/YouTube track, album, or playlist |
+| `/songs` | DELETE | Delete song from database by ID, YouTube ID, or title + artist |
 
 ### 💡 Examples
 #### 📌Run Server

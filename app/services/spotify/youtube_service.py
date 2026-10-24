@@ -103,8 +103,10 @@ def fallback_search_yt_dlp(track: Track) -> Optional[str]:
     Implements the yt-dlp fallback search by executing a system command.
     Returns a single YouTube ID or None.
     """
-    query = f"{track.Title} {track.Artist}"
-    cmd = ["yt-dlp", f"ytsearch1:{query}", "--get-id"]
+    query = f"{track.Title} {track.Artist}".strip()
+    if not query:
+        return None
+    cmd = ["yt-dlp", "--no-warnings", f"ytsearch1:{query}", "--get-id"]
     try:
         # Executes the command and captures output
         result = subprocess.check_output(cmd, text=True).strip()
